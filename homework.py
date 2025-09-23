@@ -70,6 +70,16 @@ def writeOutput(cost: float, tour: Tour) -> None:
             file.write(" ".join(map(str, city)) + "\n")
 
 
+# random initialization
+def randomInitialPopulation(cities: Tour,
+                            populationSize: int = 5) -> Population:
+    result: Population = []
+    for _ in range(populationSize):
+        randomList = sample(cities, len(cities))
+        result.append(randomList)
+    return result
+
+
 # calculate initial population using nearest neighbor heuristics
 def nearestHeuristicInitialPopulation(cities: Tour,
                                       populationSize: int = 5) -> Population:
@@ -90,6 +100,17 @@ def nearestHeuristicInitialPopulation(cities: Tour,
                         closestCity = city
             visitedCities.append(closestCity)
         result.append(visitedCities)
+    return result
+
+
+def initialPopulation(cities: Tour, populationSize: int = 5) -> Population:
+    result: Population = []
+    # divide population size into 2 halves with 70% nearest neighbor and 30% random
+    nearestNeighborSize = int(populationSize * 0.7)
+    randomSize = populationSize - nearestNeighborSize
+    result.extend(
+        nearestHeuristicInitialPopulation(cities, nearestNeighborSize))
+    result.extend(randomInitialPopulation(cities, randomSize))
     return result
 
 
@@ -159,6 +180,12 @@ def orderCrossover(parent1: Tour, parent2: Tour, tourSize: int = 5) -> Tour:
 def crossover(population: Population, populationSize: int = 5) -> Population:
     result: Population = []
     probabilities: FloatList = calculateFitness(population)
+    # implement elite selection at the rate of 30%
+    eliteSize = max(1, populationSize // 30)
+    sorted_population = [
+        tour for _, tour in sorted(zip(probabilities, population))
+    ]
+    result.extend(sorted_population[:eliteSize])
     for _ in range(populationSize):
         parent1, parent2 = selectionRouletteWheel(probabilities, population)
         result.append(orderCrossover(parent1, parent2, len(parent1)))
@@ -187,7 +214,7 @@ def main() -> None:
     # keeps track of the number of generations that dont produce a good outcome
     count = 0
     tourSize, listOfCities = readInput("input.txt")
-    initialPopulationRandom = nearestHeuristicInitialPopulation(listOfCities)
+    initialPopulationRandom = initialPopulation(listOfCities)
     probabilities = calculateFitness(initialPopulationRandom)
     # print("Initial Population: ", min(probabilities))
     for _ in range(numberOfGenerations):
