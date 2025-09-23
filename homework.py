@@ -134,13 +134,13 @@ def initialPopulation_mix(cities: Tour,
 
 def get_hyperparams(n: int) -> HyperParams:
     if n == 50:
-        return HyperParams(200, 3000, 0.08, 50, 0.7)
+        return HyperParams(200, 500, 0.08, 50, 0.7)
     if n == 100:
-        return HyperParams(150, 2000, 0.07, 40, 0.7)
+        return HyperParams(150, 400, 0.07, 40, 0.7)
     if n == 200:
-        return HyperParams(100, 1800, 0.06, 30, 0.6)
+        return HyperParams(100, 300, 0.06, 30, 0.6)
     if n == 500:
-        return HyperParams(60, 1500, 0.05, 20, 0.5)
+        return HyperParams(60, 200, 0.05, 20, 0.5)
     # fallback
     return HyperParams(populationSize(n), numberOfGenerations, mutationRate,
                        threshold, 0.7)
