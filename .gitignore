@@ -1,3 +1,14 @@
 __pycache__/
 findings.txt
 all_in_one.py
+constants.py
+crossover.py
+fitness_evaluation.py
+GATypes.py
+initial_population.py
+main.py
+mutation.py
+selection.py
+utils.py
+input/
+output.txt
