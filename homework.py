@@ -1,5 +1,4 @@
 from typing import List, cast
-from constants import numberOfGenerations, mutationRate
 from itertools import accumulate
 from random import random, sample
 from bisect import bisect
@@ -177,7 +176,7 @@ def main() -> None:
     optimalCost = float('infinity')
     # keeps track of the number of generations that dont produce a good outcome
     count = 0
-    tourSize, listOfCities = readInput("input1.txt")
+    tourSize, listOfCities = readInput("input.txt")
     initialPopulationRandom = randomInitialPopulation(listOfCities)
     probabilities = calculateFitness(initialPopulationRandom)
     # print("Initial Population: ", min(probabilities))
