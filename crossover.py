@@ -1,6 +1,6 @@
-from GATypes import Tour, Population, FloatList
+from GATypes import Tour, Population, FloatList, City
 from random import sample
-from typing import List
+from typing import List, Dict
 from fitness_evaluation import calculateFitness
 from selection import selectionRouletteWheel
 
@@ -29,10 +29,11 @@ def pmxCrossover(parent1: Tour, parent2: Tour, tourSize: int = 5) -> Tour:
     startPosition = min(positions)
     endPosition = max(positions)
     child[startPosition:endPosition] = parent1[startPosition:endPosition]
-    mapping = {
-        parent2[i]: parent1[i]
-        for i in range(startPosition, endPosition)
-    }
+    mapping: Dict[City, City] = {}
+    for i in range(startPosition, endPosition):
+        if parent2[i] not in child:
+            mapping[parent2[i]] = parent1[i]
+
     for key in mapping:
         index = parent2.index(key)
         while child[index][0] != -1:
