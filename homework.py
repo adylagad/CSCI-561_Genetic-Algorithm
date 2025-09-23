@@ -1,9 +1,8 @@
-from typing import List, cast
+from typing import Tuple, List, cast
 from itertools import accumulate
 from random import random, sample, choice
 from bisect import bisect
 from math import sqrt
-from typing import Tuple, List
 
 City = Tuple[int, int, int]
 Tour = List[Tuple[int, int, int]]
@@ -48,7 +47,11 @@ def readInput(inputPath: str) -> Input:
     inputArray: Tour = []
     with open(inputPath, "r") as file:
         for line in file:
-            city = cast(City, tuple(map(int, line.split(" "))))
+            line = line.strip()
+            if not line:
+                continue
+            parts = line.split()
+            city = cast(City, tuple(map(int, parts)))
             inputArray.append(city)
     numberOfCities: int = inputArray[0][0]
     cities: Tour = inputArray[1:]
@@ -68,6 +71,32 @@ def writeOutput(cost: float, tour: Tour) -> None:
         file.write(str(cost) + "\n")
         for city in tour:
             file.write(" ".join(map(str, city)) + "\n")
+
+
+# random initialization (used by initialPopulation)
+def randomInitialPopulation(cities: Tour,
+                            populationSize: int = 5) -> Population:
+    result: Population = []
+    for _ in range(populationSize):
+        randomList = sample(cities, len(cities))
+        result.append(randomList)
+    return result
+
+
+def initialPopulation(cities: Tour, populationSize: int = 5) -> Population:
+    """Create initial population mixing nearest-neighbor and random tours.
+
+    Uses 70% nearest-neighbor and 30% random by default.
+    """
+    result: Population = []
+    nearestNeighborSize = int(populationSize * 0.7)
+    randomSize = populationSize - nearestNeighborSize
+    if nearestNeighborSize > 0:
+        result.extend(
+            nearestHeuristicInitialPopulation(cities, nearestNeighborSize))
+    if randomSize > 0:
+        result.extend(randomInitialPopulation(cities, randomSize))
+    return result
 
 
 # calculate initial population using nearest neighbor heuristics
@@ -115,22 +144,29 @@ def calculateFitness(population: Population) -> FloatList:
     distances: FloatList = [
         calculateTotalDistance(tour) for tour in population
     ]
-    total_distance = sum(distances)
-    if total_distance == 0:
-        return [float('inf')] * len(distances)
-    return [distance / total_distance for distance in distances]
+    # lower distances are better, so use inverse distance as fitness
+    fitness: FloatList = []
+    for d in distances:
+        if d == 0:
+            fitness.append(float('inf'))
+        else:
+            fitness.append(1.0 / d)
+    total_fitness = sum(fitness)
+    if total_fitness == 0 or total_fitness == float('inf'):
+        # avoid division by zero / infinite values
+        return [1.0 / len(fitness)] * len(fitness)
+    return [f / total_fitness for f in fitness]
 
 
 # probablities is the same as the rank list, that is which tour has the highest change of getting picked
 def selectionRouletteWheel(probabilities: FloatList,
                            population: Population) -> Parents:
     parent: Population = []
+    cumulativeSum: FloatList = list(accumulate(probabilities))
     for _ in range(2):
-        cululativeSum: FloatList = list(accumulate(probabilities))
-        randomNumber: float = random()
-        index: int = bisect(cululativeSum, randomNumber)
-        # print(cululativeSum)
-        # print(randomNumber, index)
+        randomNumber: float = random() * cumulativeSum[-1]
+        index: int = bisect(cumulativeSum, randomNumber)
+        index = min(index, len(population) - 1)
         parent.append(population[index])
     return (
         parent[0],
@@ -159,9 +195,19 @@ def orderCrossover(parent1: Tour, parent2: Tour, tourSize: int = 5) -> Tour:
 def crossover(population: Population, populationSize: int = 5) -> Population:
     result: Population = []
     probabilities: FloatList = calculateFitness(population)
-    for _ in range(populationSize):
+    # keep top 10% as elites
+    eliteSize = max(1, populationSize // 10)
+    # sort by fitness descending
+    paired = sorted(zip(probabilities, population),
+                    key=lambda x: x[0],
+                    reverse=True)
+    elites = [tour for _, tour in paired[:eliteSize]]
+    result.extend(elites)
+    # produce remaining children
+    while len(result) < populationSize:
         parent1, parent2 = selectionRouletteWheel(probabilities, population)
-        result.append(orderCrossover(parent1, parent2, len(parent1)))
+        child = orderCrossover(parent1, parent2, len(parent1))
+        result.append(child)
     return result
 
 
@@ -181,38 +227,45 @@ def mutate(population: Population,
 
 
 def main() -> None:
-    optimalProbability = float('infinity')
+    # optimalProbability = float('infinity')
     optimalTour: Tour = []
     optimalCost = float('infinity')
     # keeps track of the number of generations that dont produce a good outcome
     count = 0
     tourSize, listOfCities = readInput("input.txt")
-    initialPopulationRandom = nearestHeuristicInitialPopulation(listOfCities)
+    pop_size = populationSize(tourSize)
+    initialPopulationRandom = initialPopulation(listOfCities, pop_size)
     probabilities = calculateFitness(initialPopulationRandom)
-    # print("Initial Population: ", min(probabilities))
+    best_cost = float('infinity')
+    best_tour: Tour = []
     for _ in range(numberOfGenerations):
         if count > threshold:
             break
-        newPopulation = mutate(
-            crossover(initialPopulationRandom, populationSize(tourSize)),
-            mutationRate, tourSize)
+        children = crossover(initialPopulationRandom, pop_size)
+        newPopulation = mutate(children, mutationRate, tourSize)
         probabilities = calculateFitness(newPopulation)
-        localMinimum = min(probabilities)
-        if localMinimum < optimalProbability:
-            distances: FloatList = [
-                calculateTotalDistance(tour) for tour in newPopulation
-            ]
-            optimalProbability = localMinimum
-            index = probabilities.index(optimalProbability)
-            optimalCost = distances[index]
-            optimalTour = newPopulation[index]
+
+        # find best in this generation (highest fitness -> shortest distance)
+        fitness_values = probabilities
+        max_fitness = max(fitness_values)
+        idx = fitness_values.index(max_fitness)
+        gen_cost = calculateTotalDistance(newPopulation[idx])
+        if gen_cost < best_cost:
+            best_cost = gen_cost
+            best_tour = newPopulation[idx]
             count = 0
-        count += 1
+        else:
+            count += 1
+
+        # prepare for next generation
+        initialPopulationRandom = newPopulation
     # print("Optimal Probability: ", optimalProbability)
     # print("Optimal Cost: ", optimalCost)
-    optimalTour.append(optimalTour[0])
-    # print("Optimal Tour: ", optimalTour)
-    writeOutput(optimalCost, optimalTour)
+    if best_tour:
+        best_tour.append(best_tour[0])
+        writeOutput(best_cost, best_tour)
+    else:
+        writeOutput(optimalCost, optimalTour)
 
 
 if __name__ == "__main__":
