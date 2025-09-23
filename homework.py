@@ -11,7 +11,10 @@ Population = List[List[Tuple[int, int, int]]]
 Input = Tuple[int, List[Tuple[int, int, int]]]
 FloatList = List[float]
 Parents = Tuple[Tour, Tour]
+CityIndex = Dict[City, int]
+DistanceMatrix = List[List[float]]
 
+# can i remove this?
 mutationRate = 0.05
 numberOfGenerations = 3500
 threshold = 50
@@ -81,51 +84,24 @@ def euclideanDistance(city1: City, city2: City) -> float:
                 zDistance * zDistance)
 
 
-# cached distance matrix and index mapping (populated in `main`)
-city_index: Dict[City, int] = {}
-dist_matrix: List[List[float]] = []
+cityIndex: CityIndex = {}
+distanceMatrix: DistanceMatrix = []
 
 
-def build_distance_matrix(cities: Tour) -> None:
-    global city_index, dist_matrix
-    city_index = {city: i for i, city in enumerate(cities)}
+def buildDistanceMatrix(cities: Tour) -> None:
+    global cityIndex, distanceMatrix
+    cityIndex = {city: i for i, city in enumerate(cities)}
     n = len(cities)
-    dist_matrix = [[0.0] * n for _ in range(n)]
+    distanceMatrix = [[0.0] * n for _ in range(n)]
     for i in range(n):
         for j in range(i + 1, n):
             d = euclideanDistance(cities[i], cities[j])
-            dist_matrix[i][j] = d
-            dist_matrix[j][i] = d
+            distanceMatrix[i][j] = d
+            distanceMatrix[j][i] = d
 
 
-def tour_to_index_list(tour: Tour) -> List[int]:
-    return [city_index[c] for c in tour]
-
-
-def two_opt_delta(tour: Tour, max_iterations: int = 50) -> Tour:
-    n = len(tour)
-    if n < 4:
-        return tour
-    idxs = tour_to_index_list(tour)
-    improved = True
-    iterations = 0
-    while improved and iterations < max_iterations:
-        improved = False
-        iterations += 1
-        for i in range(1, n - 2):
-            for j in range(i + 1, n - 1):
-                a, b = idxs[i - 1], idxs[i]
-                c, d = idxs[j], idxs[(j + 1) % n]
-                before = dist_matrix[a][b] + dist_matrix[c][d]
-                after = dist_matrix[a][c] + dist_matrix[b][d]
-                if after < before:
-                    idxs[i:j + 1] = list(reversed(idxs[i:j + 1]))
-                    improved = True
-                    break
-            if improved:
-                break
-    inv = {v: k for k, v in city_index.items()}
-    return [inv[i] for i in idxs]
+def tourIndexList(tour: Tour) -> List[int]:
+    return [cityIndex[c] for c in tour]
 
 
 def readInput(inputPath: str) -> Input:
@@ -149,12 +125,26 @@ def writeOutput(cost: float,
 
 
 def calculateTotalDistance(tour: Tour) -> float:
-    totalDistance = 0.0
-    for i in range(len(tour)):
-        city1 = tour[i]
-        city2 = tour[(i + 1) % len(tour)]
-        totalDistance += euclideanDistance(city1, city2)
-    return totalDistance
+    # Use precomputed distanceMatrix when available for speed.
+    n = len(tour)
+    if n == 0:
+        return 0.0
+    try:
+        idxs = [cityIndex[c] for c in tour]
+        total = 0.0
+        for i in range(n):
+            a = idxs[i]
+            b = idxs[(i + 1) % n]
+            total += distanceMatrix[a][b]
+        return total
+    except Exception:
+        # Fallback to Euclidean if indexing not available
+        totalDistance = 0.0
+        for i in range(n):
+            city1 = tour[i]
+            city2 = tour[(i + 1) % n]
+            totalDistance += euclideanDistance(city1, city2)
+        return totalDistance
 
 
 def calculateFitness(population: Population) -> FloatList:
@@ -189,20 +179,35 @@ def nearestHeuristicInitialPopulation(cities: Tour,
                                       populationSize: int = 5) -> Population:
     result: Population = []
     for _ in range(populationSize):
-        visitedCities: Tour = []
-        startCity: City = choice(cities)
-        visitedCities.append(startCity)
-        for _ in range(len(cities) - 1):
-            closestCity: City = startCity
-            distance: float = float('infinity')
-            for city in cities:
-                if city not in visitedCities:
-                    distanceBetweenTwoCities: float = euclideanDistance(
-                        startCity, city)
-                    if distanceBetweenTwoCities < distance:
-                        distance = distanceBetweenTwoCities
-                        closestCity = city
-            visitedCities.append(closestCity)
+        # Use index-based nearest neighbour to avoid repeated tuple comparisons
+        n = len(cities)
+        if n == 0:
+            result.append([])
+            continue
+        start_idx = cityIndex.get(choice(cities), None)
+        if start_idx is None:
+            startCity = choice(cities)
+            visitedCities = [startCity]
+            remaining = set(cities) - set(visitedCities)
+            while remaining:
+                last_city = visitedCities[-1]
+                nxt = min(remaining,
+                          key=lambda c: euclideanDistance(last_city, c))
+                visitedCities.append(nxt)
+                remaining.remove(nxt)
+            result.append(visitedCities)
+            continue
+
+        visited_idxs = [start_idx]
+        remaining = set(range(n)) - set(visited_idxs)
+        while remaining:
+            last_idx = visited_idxs[-1]
+            # find nearest by scanning distanceMatrix row for last_idx
+            nearest = min(remaining, key=lambda r: distanceMatrix[last_idx][r])
+            visited_idxs.append(nearest)
+            remaining.remove(nearest)
+        inv = {v: k for k, v in cityIndex.items()}
+        visitedCities = [inv[i] for i in visited_idxs]
         result.append(visitedCities)
     return result
 
@@ -351,7 +356,7 @@ def crossover(population: Population, populationSize: int = 5) -> Population:
         for c in children:
             if len(result) < populationSize:
                 # apply a quick local improvement to child
-                result.append(two_opt_delta(c, max_iterations=8))
+                result.append(twoOptDelta(c, max_iterations=8))
             else:
                 break
 
@@ -384,25 +389,44 @@ def mutate(population: Population,
     return population
 
 
-def twoOpt(tour: Tour, maxIterations: int = 50) -> Tour:
+def twoOptDelta(tour: Tour, max_iterations: int = 50) -> Tour:
     n = len(tour)
     if n < 4:
         return tour
+    idxs = tourIndexList(tour)
+
+    # adapt iterations based on problem size to avoid excessive runtimes
+    if n >= 500:
+        max_it = max(8, max_iterations // 8)
+    elif n >= 200:
+        max_it = max(12, max_iterations // 4)
+    else:
+        max_it = max_iterations
 
     improved = True
     iterations = 0
-    while improved and iterations < maxIterations:
+    while improved and iterations < max_it:
         improved = False
         iterations += 1
         for i in range(1, n - 2):
             for j in range(i + 1, n - 1):
-                tour[i:j + 1] = reversed(tour[i:j + 1])
-                improved = True
-                break
+                a, b = idxs[i - 1], idxs[i]
+                c, d = idxs[j], idxs[(j + 1) % n]
+                before = distanceMatrix[a][b] + distanceMatrix[c][d]
+                after = distanceMatrix[a][c] + distanceMatrix[b][d]
+                if after < before:
+                    idxs[i:j + 1] = list(reversed(idxs[i:j + 1]))
+                    improved = True
+                    break
             if improved:
                 break
+    inv = {v: k for k, v in cityIndex.items()}
+    return [inv[i] for i in idxs]
 
-    return tour
+
+def twoOpt(tour: Tour, maxIterations: int = 50) -> Tour:
+    # simple wrapper to keep compatibility; delegate to twoOptDelta
+    return twoOptDelta(tour, max_iterations=maxIterations)
 
 
 def applyTwoOptElites(population: Population,
@@ -416,7 +440,7 @@ def applyTwoOptElites(population: Population,
     indexed.sort(key=lambda iv: probabilities[iv[0]], reverse=True)
     new_pop = [tour.copy() for tour in population]
     for idx, _ in indexed[:eliteSize]:
-        improved = two_opt_delta(new_pop[idx], max_iterations=maxIterations)
+        improved = twoOptDelta(new_pop[idx], max_iterations=maxIterations)
         new_pop[idx] = improved
 
     return new_pop
@@ -425,7 +449,7 @@ def applyTwoOptElites(population: Population,
 def main() -> None:
     count = 0
     tourSize, listOfCities = readInput("input.txt")
-    build_distance_matrix(listOfCities)
+    buildDistanceMatrix(listOfCities)
 
     params = getParams(tourSize)
     popSize = params.population
@@ -451,8 +475,8 @@ def main() -> None:
         probabilities = calculateFitness(newPopulation)
 
         try:
-            hp = getParams(tourSize)
-            eliteSize = max(1, int(0.05 * hp.population))
+            hyperParams = getParams(tourSize)
+            eliteSize = max(1, int(0.05 * hyperParams.population))
         except Exception:
             eliteSize = 1
         newPopulation = applyTwoOptElites(newPopulation,
@@ -473,9 +497,25 @@ def main() -> None:
         population = newPopulation
 
     if bestTour:
-        bestTour.append(bestTour[0])
+        # Ensure we do not double-count the closing edge when recomputing cost.
+        tour_no_dup = bestTour[:-1] if len(
+            bestTour) > 1 and bestTour[0] == bestTour[-1] else bestTour
+
+        # Recompute actual cost from the final tour (without duplicate end)
+        actual_cost = calculateTotalDistance(tour_no_dup)
+        if not isfinite(actual_cost):
+            print("Warning: computed non-finite cost for final tour")
+        if abs(actual_cost - bestCost) > 1e-6:
+            # Report and correct mismatch
+            print(
+                "Notice: reported bestCost did not match recomputed cost. Using recomputed value."
+            )
+            bestCost = actual_cost
+
+        # Prepare output tour with explicit return-to-start as required by some judges
+        output_tour = tour_no_dup + [tour_no_dup[0]] if tour_no_dup else []
         try:
-            writeOutput(bestCost, bestTour, "output.txt")
+            writeOutput(bestCost, output_tour, "output.txt")
         except Exception as e:
             print("Failed to write output:", e)
 
