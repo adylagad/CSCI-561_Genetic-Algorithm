@@ -1,25 +1,33 @@
 from GATypes import Tour, FloatList, Population
 from utils import euclideanDistance
+from math import isfinite
 
 
 # total distance of the route
 def calculateTotalDistance(tour: Tour) -> float:
-    total_distance = 0.0
+    totalDistance = 0.0
     for i in range(len(tour)):
         city1 = tour[i]
         city2 = tour[(i + 1) % len(tour)]
-        total_distance += euclideanDistance(city1, city2)
+        totalDistance += euclideanDistance(city1, city2)
 
-    return total_distance
+    return totalDistance
 
 
-# percentage of score associated with total distance of the route
-# to do: improve the calculate fitness function
 def calculateFitness(population: Population) -> FloatList:
     distances: FloatList = [
         calculateTotalDistance(tour) for tour in population
     ]
-    total_distance = sum(distances)
-    if total_distance == 0:
-        return [float('inf')] * len(distances)
-    return [distance / total_distance for distance in distances]
+    rawFitness: FloatList = []
+    for d in distances:
+        if d <= 0 or not isfinite(d):
+            rawFitness.append(1e12)
+        else:
+            rawFitness.append(1.0 / d)
+
+    totalFitness = sum(rawFitness)
+    if totalFitness <= 0 or not isfinite(totalFitness):
+        n = len(rawFitness) or 1
+        return [1.0 / n] * n
+
+    return [f / totalFitness for f in rawFitness]

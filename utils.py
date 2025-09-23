@@ -1,6 +1,7 @@
 from math import sqrt
 from typing import cast
-from GATypes import City, Input, Tour, Population
+from GATypes import City, Input, Tour
+from typing import List
 
 
 # to do:
@@ -26,23 +27,38 @@ def euclideanDistance(city1: City, city2: City) -> float:
 
 # read input from file
 def readInput(inputPath: str) -> Input:
-    inputArray: Tour = []
-    with open(inputPath, "r") as file:
-        for line in file:
-            city = cast(City, tuple(map(int, line.split(" "))))
-            inputArray.append(city)
-    numberOfCities: int = inputArray[0][0]
-    cities: Tour = inputArray[1:]
+    lines: List[str] = []
+    with open(inputPath, "r", encoding="utf-8") as f:
+        for raw in f:
+            s = raw.strip()
+            if not s:
+                continue
+            lines.append(s)
+
+    if not lines:
+        raise ValueError(f"Empty input file: {inputPath}")
+
+    try:
+        numberOfCities = int(lines[0].split()[0])
+    except Exception as e:
+        raise ValueError(f"First line must contain number of cities: {e}")
+
+    cities: Tour = []
+    for line in lines[1:1 + numberOfCities]:
+        parts = line.split()
+        if len(parts) < 3:
+            raise ValueError(f"Invalid city line (expected 3 ints): '{line}'")
+        city = cast(City, tuple(map(int, parts[:3])))
+        cities.append(city)
 
     return (numberOfCities, cities)
 
 
-# verify if number of cities is correct
-def verifyNumberOfCities(numberOfCities: int, cities: Tour) -> bool:
-    return numberOfCities == len(cities)
-
-
-# print population with each tours on new line
-def printPopulation(population: Population) -> None:
-    for tour in population:
-        print(tour)
+def writeOutput(cost: float,
+                tour: Tour,
+                outputPath: str = "output.txt") -> None:
+    with open(outputPath, "w", encoding="utf-8") as f:
+        f.write(f"{cost}\n")
+        for city in tour:
+            # write coordinates without brackets, space-separated
+            f.write(f"{city[0]} {city[1]} {city[2]}\n")
