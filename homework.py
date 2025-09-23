@@ -81,6 +81,53 @@ def euclideanDistance(city1: City, city2: City) -> float:
                 zDistance * zDistance)
 
 
+# cached distance matrix and index mapping (populated in `main`)
+city_index: Dict[City, int] = {}
+dist_matrix: List[List[float]] = []
+
+
+def build_distance_matrix(cities: Tour) -> None:
+    global city_index, dist_matrix
+    city_index = {city: i for i, city in enumerate(cities)}
+    n = len(cities)
+    dist_matrix = [[0.0] * n for _ in range(n)]
+    for i in range(n):
+        for j in range(i + 1, n):
+            d = euclideanDistance(cities[i], cities[j])
+            dist_matrix[i][j] = d
+            dist_matrix[j][i] = d
+
+
+def tour_to_index_list(tour: Tour) -> List[int]:
+    return [city_index[c] for c in tour]
+
+
+def two_opt_delta(tour: Tour, max_iterations: int = 50) -> Tour:
+    n = len(tour)
+    if n < 4:
+        return tour
+    idxs = tour_to_index_list(tour)
+    improved = True
+    iterations = 0
+    while improved and iterations < max_iterations:
+        improved = False
+        iterations += 1
+        for i in range(1, n - 2):
+            for j in range(i + 1, n - 1):
+                a, b = idxs[i - 1], idxs[i]
+                c, d = idxs[j], idxs[(j + 1) % n]
+                before = dist_matrix[a][b] + dist_matrix[c][d]
+                after = dist_matrix[a][c] + dist_matrix[b][d]
+                if after < before:
+                    idxs[i:j + 1] = list(reversed(idxs[i:j + 1]))
+                    improved = True
+                    break
+            if improved:
+                break
+    inv = {v: k for k, v in city_index.items()}
+    return [inv[i] for i in idxs]
+
+
 def readInput(inputPath: str) -> Input:
     with open(inputPath, "r", encoding="utf-8") as f:
         nLine = f.readline()
@@ -303,7 +350,8 @@ def crossover(population: Population, populationSize: int = 5) -> Population:
         children = makeChildren(parent1, parent2)
         for c in children:
             if len(result) < populationSize:
-                result.append(c)
+                # apply a quick local improvement to child
+                result.append(two_opt_delta(c, max_iterations=8))
             else:
                 break
 
@@ -368,7 +416,7 @@ def applyTwoOptElites(population: Population,
     indexed.sort(key=lambda iv: probabilities[iv[0]], reverse=True)
     new_pop = [tour.copy() for tour in population]
     for idx, _ in indexed[:eliteSize]:
-        improved = twoOpt(new_pop[idx], maxIterations=maxIterations)
+        improved = two_opt_delta(new_pop[idx], max_iterations=maxIterations)
         new_pop[idx] = improved
 
     return new_pop
@@ -377,6 +425,7 @@ def applyTwoOptElites(population: Population,
 def main() -> None:
     count = 0
     tourSize, listOfCities = readInput("input.txt")
+    build_distance_matrix(listOfCities)
 
     params = getParams(tourSize)
     popSize = params.population
