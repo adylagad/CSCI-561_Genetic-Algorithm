@@ -1,3 +1,6 @@
+# Assignment/Homework 1
+# Name: Aditya Ashok Lagad
+
 from typing import List, Dict, Tuple, Optional
 from itertools import accumulate
 from random import random, sample, choice
@@ -26,7 +29,8 @@ class Params:
     nearestFraction: float  # fraction of initial population to be generated from the nearest heuristic initial population
 
 
-# types for better clarity and code quality
+# types for better clarity and understandibility of the code
+# improves code quality
 City = Tuple[int, int, int]
 Tour = List[Tuple[int, int, int]]
 Population = List[List[Tuple[int, int, int]]]
@@ -59,11 +63,11 @@ def getParams(n: int) -> Params:
         return presets[200]
 
     # default case
-    return Params(population=max(20, n // 5),
-                  generations=max(50, 1000 // (n // 100 + 1)),
-                  mutationRate=0.05,
-                  threshold=20,
-                  nearestFraction=0.5)
+    # the assignment does not say anything about different sizes inputs, different from the ones in the presets
+    # Have handled the default case anyways for differnt input problem size
+    # +1 to avoid division by zero
+    return Params(max(20, n // 5), max(50, 1000 // (n // 100 + 1)), 0.05, 20,
+                  0.5)
 
 
 # calculate the Euclidean distance between two cities/points
@@ -81,6 +85,7 @@ def euclideanDistance(city1: City, city2: City) -> float:
 def readInput(inputPath: str = INPUT_FILE) -> Input:
     with open(inputPath, "r", encoding=ENCODING) as f:
         nLine = f.readline()
+        # the first line is the total number of cities in the tour
         numberOfCities = int(nLine.split()[0])
         cities: Tour = []
         for _ in range(numberOfCities):
@@ -94,12 +99,14 @@ def writeOutput(cost: float,
                 tour: Tour,
                 outputPath: str = OUTPUT_FILE) -> None:
     with open(outputPath, "w", encoding=ENCODING) as f:
+        # first line is the cost of the tour
         f.write(f"{cost}\n")
         for city in tour:
             f.write(f"{city[0]} {city[1]} {city[2]}\n")
 
 
 # city index pair
+# easy for calculations
 cityIndex: CityIndex = {}
 # record the distances between every pair of cities in the tour
 distanceMatrix: DistanceMatrix = []
@@ -107,6 +114,7 @@ distanceMatrix: DistanceMatrix = []
 
 # calculate the distance between evert pair of cities and store it in a matrix
 # also used to calculate the two opt where the weight of the edges is calculated to see if there is an overlap
+# helps in faster calculations
 def buildDistanceMatrix(cities: Tour) -> None:
     global cityIndex, distanceMatrix
     cityIndex = {city: i for i, city in enumerate(cities)}
@@ -120,6 +128,7 @@ def buildDistanceMatrix(cities: Tour) -> None:
 
 
 # return a list of indices associated with the cities in the tour
+# convert the tour of cities into indices for faster operations
 def tourIndexList(tour: Tour) -> List[int]:
     return [cityIndex[c] for c in tour]
 
@@ -138,6 +147,7 @@ def calculateTotalDistance(tour: Tour) -> float:
             total += distanceMatrix[a][b]
         return total
     # if calculating distance from the matrix fails, calculate the distance by calculating the distance between every pair of cities
+    # fallback to avoid errors
     except Exception:
         totalDistance = 0.0
         for i in range(n):
@@ -187,6 +197,7 @@ def nearestHeuristicInitialPopulation(cities: Tour,
             result.append([])
             continue
         startIndex = cityIndex.get(choice(cities), None)
+        # is the city is not mapped with the index
         if startIndex is None:
             startCity = choice(cities)
             visitedCities = [startCity]
@@ -194,7 +205,7 @@ def nearestHeuristicInitialPopulation(cities: Tour,
             while remaining:
                 lastCity = visitedCities[-1]
                 next = min(remaining,
-                           key=lambda c: euclideanDistance(lastCity, c))
+                           key=lambda city: euclideanDistance(lastCity, city))
                 visitedCities.append(next)
                 remaining.remove(next)
             result.append(visitedCities)
@@ -202,14 +213,17 @@ def nearestHeuristicInitialPopulation(cities: Tour,
 
         visitedIndices = [startIndex]
         remaining = set(range(n)) - set(visitedIndices)
+        # if the cities are mapped with indices, find the closes city from the distance matrix
         while remaining:
             lastIndex = visitedIndices[-1]
             nearest = min(remaining,
-                          key=lambda r: distanceMatrix[lastIndex][r])
+                          key=lambda remain: distanceMatrix[lastIndex][remain])
             visitedIndices.append(nearest)
             remaining.remove(nearest)
-        inv = {index: city for city, index in cityIndex.items()}
-        visitedCities = [inv[i] for i in visitedIndices]
+        # convert the city: index mapping back to index: city
+        # helps return the Tour based on the indices used
+        inverse = {index: city for city, index in cityIndex.items()}
+        visitedCities = [inverse[i] for i in visitedIndices]
         result.append(visitedCities)
     return result
 
@@ -226,8 +240,10 @@ def initialPopulation(cities: Tour,
     randomCount = populationSize - nearestCount
 
     result: Population = []
+    # apply nearest heuristic method
     if nearestCount > 0:
         result.extend(nearestHeuristicInitialPopulation(cities, nearestCount))
+    # randomly select cities from the input tour
     if randomCount > 0:
         result.extend(randomInitialPopulation(cities, randomCount))
 
@@ -246,6 +262,7 @@ def selectionRouletteWheel(probabilities: FloatList,
         a, b = sample(population, 2)
         return (a, b)
 
+    # cumulative sum of the probabilities
     cumulative: FloatList = list(accumulate(
         max(0.0, p) for p in probabilities))
     total = cumulative[-1] if cumulative else 0.0
@@ -265,19 +282,19 @@ def selectionRouletteWheel(probabilities: FloatList,
             index = n - 1
         return index
 
-    i1 = pickOne()
-    i2 = pickOne()
-    if n > 1 and i1 == i2:
+    index1 = pickOne()
+    index2 = pickOne()
+    if n > 1 and index1 == index2:
         for _ in range(3):
-            i2 = pickOne()
-            if i2 != i1:
+            index2 = pickOne()
+            if index2 != index1:
                 break
         else:
-            choices = [i for i in range(n) if i != i1]
+            choices = [i for i in range(n) if i != index1]
             if choices:
-                i2 = choices[int(random() * len(choices))]
+                index2 = choices[int(random() * len(choices))]
 
-    return (population[i1], population[i2])
+    return (population[index1], population[index2])
 
 
 # implementation of order crossover
@@ -348,7 +365,8 @@ def crossover(population: Population,
         probabilities = calculateFitness(population)
 
     indexed = list(enumerate(population))
-    indexed.sort(key=lambda iv: probabilities[iv[0]], reverse=True)
+    indexed.sort(key=lambda indexValue: probabilities[indexValue[0]],
+                 reverse=True)
     elites = [tour for (_, tour) in indexed[:eliteSize]]
 
     result: Population = []
@@ -381,16 +399,19 @@ def mutate(population: Population,
         if size < 2:
             continue
         if random() <= mutationRate:
-            op = method
+            option = method
             if method == AUTO:
-                op = INVERT if size >= 8 else SWAP
+                option = INVERT if size >= 8 else SWAP
 
-            if op == SWAP:
+            # swaps two cities randomly
+            if option == SWAP:
                 i, j = sample(range(size), 2)
                 tour[i], tour[j] = tour[j], tour[i]
-            elif op == INVERT:
+            # changes the order of the cities visited randomly
+            elif option == INVERT:
                 i, j = sorted(sample(range(size), 2))
                 tour[i:j + 1] = reversed(tour[i:j + 1])
+            # default: swap mutation
             else:
                 i, j = sample(range(size), 2)
                 tour[i], tour[j] = tour[j], tour[i]
@@ -398,24 +419,28 @@ def mutate(population: Population,
     return population
 
 
+# two delta implementation which checks if there are any overlapping edges in the tour and swaps them if any
+# returns improved tour
 def twoOptDelta(tour: Tour, maxIterations: int = 50) -> Tour:
     n = len(tour)
     if n < 4:
         return tour
     indices = tourIndexList(tour)
 
+    # reduce the number of iterations for large tours
     if n >= 500:
-        maxIt = max(8, maxIterations // 8)
+        maxIter = max(8, maxIterations // 8)
     elif n >= 200:
-        maxIt = max(12, maxIterations // 4)
+        maxIter = max(12, maxIterations // 4)
     else:
-        maxIt = maxIterations
+        maxIter = maxIterations
 
     improved = True
     iterations = 0
-    while improved and iterations < maxIt:
+    while improved and iterations < maxIter:
         improved = False
         iterations += 1
+        # checks if there are any overlaps and if the cost for the tour can be imroved
         for i in range(1, n - 2):
             for j in range(i + 1, n - 1):
                 a, b = indices[i - 1], indices[i]
@@ -428,8 +453,10 @@ def twoOptDelta(tour: Tour, maxIterations: int = 50) -> Tour:
                     break
             if improved:
                 break
-    inv = {index: city for city, index in cityIndex.items()}
-    return [inv[i] for i in indices]
+    # convert the city: index mapping back to index: city
+    # helps return the Tour based on the indices used
+    inverse = {index: city for city, index in cityIndex.items()}
+    return [inverse[i] for i in indices]
 
 
 # elitism: keep the tours with good fitness in the new population to get optimal results
@@ -441,11 +468,14 @@ def applyTwoOptElites(population: Population,
         return population
 
     indexed = list(enumerate(population))
-    indexed.sort(key=lambda iv: probabilities[iv[0]], reverse=True)
+    # sort the population based on the fitness scores (probabilities)
+    # helps decide which tours should be carried forward in the new population
+    indexed.sort(key=lambda indexValue: probabilities[indexValue[0]],
+                 reverse=True)
     newPop = [tour.copy() for tour in population]
-    for idx, _ in indexed[:eliteSize]:
-        improved = twoOptDelta(newPop[idx], maxIterations)
-        newPop[idx] = improved
+    for index, _ in indexed[:eliteSize]:
+        improved = twoOptDelta(newPop[index], maxIterations)
+        newPop[index] = improved
 
     return newPop
 
@@ -457,6 +487,7 @@ def main() -> None:
     tourSize, listOfCities = readInput(INPUT_FILE)
     buildDistanceMatrix(listOfCities)
 
+    # parameters based on the tour size
     params = getParams(tourSize)
     popSize = params.population
     generations = params.generations
@@ -467,7 +498,9 @@ def main() -> None:
     population: Population = initialPopulation(listOfCities, popSize,
                                                nearestFraction)
 
+    # fitness scores of the initial population
     probabilities = calculateFitness(population)
+    # keep track of the best tours and the cost
     bestCost = INFINITY
     bestTour: Tour = []
 
@@ -476,29 +509,34 @@ def main() -> None:
         if count > runThreshold:
             break
 
+        # calculate the fitness/probabilities for every generation
         probabilities = calculateFitness(population)
 
+        # apply crossover and mutation
         children = crossover(population, popSize, probabilities)
         newPopulation = mutate(children, mutRate, tourSize)
 
         parameters = getParams(tourSize)
+        # how many elite tours should be selected to apply 2opt on them
+        # 5% of the best tours gets selected for more improvements
         eliteSize = max(1, int(0.05 * parameters.population))
 
         if tourSize <= 50:
+            # apply 2opt every 5 generations
             if generation % 5 == 0:
-                newPopulation = applyTwoOptElites(newPopulation,
-                                                  probabilities,
-                                                  eliteSize=eliteSize,
-                                                  maxIterations=10)
+                newPopulation = applyTwoOptElites(newPopulation, probabilities,
+                                                  eliteSize, 10)
+        # apply for every generations
+        # since the number of tours are higher in every generation, the scope for improvement is higher
         else:
-            newPopulation = applyTwoOptElites(newPopulation,
-                                              probabilities,
-                                              eliteSize=eliteSize,
-                                              maxIterations=20)
+            newPopulation = applyTwoOptElites(newPopulation, probabilities,
+                                              eliteSize, 20)
 
         maxFitness = max(probabilities)
         idx = probabilities.index(maxFitness)
         genCost = calculateTotalDistance(newPopulation[idx])
+        # compare the generation cost with the best cost and update the global best cost and tour
+        # else update the counter
         if genCost < bestCost:
             bestCost = genCost
             bestTour = newPopulation[idx]
