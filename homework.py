@@ -165,6 +165,7 @@ def calculateFitness(population: Population) -> FloatList:
         calculateTotalDistance(tour) for tour in population
     ]
     rawFitness: FloatList = []
+    # less the cost -> more the fitness
     for dist in distances:
         rawFitness.append(1.0 / dist)
 
@@ -173,6 +174,8 @@ def calculateFitness(population: Population) -> FloatList:
         n = len(rawFitness) or 1
         return [1.0 / n] * n
 
+    # represents probability of getting picked
+    # lower the cost, higher the fitness and higher the probability of getting picked
     return [fitness / totalFitness for fitness in rawFitness]
 
 
@@ -181,6 +184,7 @@ def randomInitialPopulation(cities: Tour,
                             populationSize: int = 5) -> Population:
     result: Population = []
     for _ in range(populationSize):
+        # randomly select cities
         randomList = sample(cities, len(cities))
         result.append(randomList)
     return result
@@ -236,6 +240,7 @@ def initialPopulation(cities: Tour,
     if populationSize <= 0:
         return []
 
+    # calculate the number of cities to be generated using heuristics based on nearestFraction
     nearestCount = int(populationSize * nearestFraction)
     randomCount = populationSize - nearestCount
 
@@ -276,12 +281,13 @@ def selectionRouletteWheel(probabilities: FloatList,
     # pick a city in the tour based on the probability
     # heart of the roulette wheel selection
     def pickOne() -> int:
-        r = random() * total
-        index = bisect(cumulative, r)
+        randomIndex = random() * total
+        index = bisect(cumulative, randomIndex)
         if index >= n:
             index = n - 1
         return index
 
+    # pick two cities randomly
     index1 = pickOne()
     index2 = pickOne()
     if n > 1 and index1 == index2:
@@ -298,14 +304,15 @@ def selectionRouletteWheel(probabilities: FloatList,
 
 
 # implementation of order crossover
-# randomly picks sub array from parent 1 and fill the city in child tour in order as they appear in parent 2
 def orderCrossover(parent1: Tour, parent2: Tour, tourSize: int = 5) -> Tour:
     child: Tour = [(-1, -1, -1)] * len(parent1)
+    # randomly picks sub array positions (start index and end index) from parent 1
     positions: List[int] = sample(range(tourSize), 2)
     startPosition = min(positions)
     endPosition = max(positions)
     child[startPosition:endPosition] = parent1[startPosition:endPosition]
     i: int = 0
+    # fill the city in child tour in order as they appear in parent 2
     for j in range(len(child)):
         if child[j][0] == -1:
             while parent2[i] in child:
@@ -315,21 +322,20 @@ def orderCrossover(parent1: Tour, parent2: Tour, tourSize: int = 5) -> Tour:
 
 
 # implementation of partially mapped crossover
-# randomly picks sub array from parent 1
-# create a mapping of cities from parent 2 to parent 1 in the same range as the sub array
-# fill the cities in the child tour based on the mapping
-# fill the remaining positions in the child tour in order as they appear in the parent 2
 def pmxCrossover(parent1: Tour, parent2: Tour, tourSize: int = 5) -> Tour:
     child: Tour = [(-1, -1, -1)] * len(parent1)
+    # randomly picks sub array positions (start index and end index) from parent 1
     positions: List[int] = sample(range(tourSize), 2)
     startPosition = min(positions)
     endPosition = max(positions)
+    # append the sub array in child directly
     child[startPosition:endPosition] = parent1[startPosition:endPosition]
     mapping: Dict[City, City] = {}
+    # create a mapping of cities from parent 2 to parent 1 in the same range as the sub array
     for i in range(startPosition, endPosition):
         if parent2[i] not in child:
             mapping[parent2[i]] = parent1[i]
-
+    # fill the cities in the child tour based on the mapping
     for key in mapping:
         index = parent2.index(key)
         while child[index][0] != -1:
@@ -337,6 +343,7 @@ def pmxCrossover(parent1: Tour, parent2: Tour, tourSize: int = 5) -> Tour:
             index = newIndex
         child[index] = key
     i: int = 0
+    # fill the remaining positions in the child tour in order as they appear in the parent 2
     for j in range(len(child)):
         if child[j][0] == -1:
             while parent2[i] in child:
@@ -346,77 +353,11 @@ def pmxCrossover(parent1: Tour, parent2: Tour, tourSize: int = 5) -> Tour:
 
 
 # hybrid implementation of order crossover and pmx crossover
-def makeChildren(p1: Tour, p2: Tour) -> List[Tour]:
-    size = len(p1)
-    child1 = orderCrossover(p1, p2, size)
-    child2 = pmxCrossover(p1, p2, size)
+def makeChildren(parent1: Tour, parent2: Tour) -> List[Tour]:
+    size = len(parent1)
+    child1 = orderCrossover(parent1, parent2, size)
+    child2 = pmxCrossover(parent1, parent2, size)
     return [child1, child2]
-
-
-# crossover implementation to produce new population
-def crossover(population: Population,
-              populationSize: int = 5,
-              probabilities: Optional[FloatList] = None) -> Population:
-
-    parameters = getParams(len(population[0]))
-    eliteSize = max(1, int(0.05 * parameters.population))
-
-    if probabilities is None:
-        probabilities = calculateFitness(population)
-
-    indexed = list(enumerate(population))
-    indexed.sort(key=lambda indexValue: probabilities[indexValue[0]],
-                 reverse=True)
-    elites = [tour for (_, tour) in indexed[:eliteSize]]
-
-    result: Population = []
-    for e in elites:
-        result.append(e)
-
-    tourSize = len(population[0]) if population else 0
-    childTwoOptBudget = 6 if tourSize <= 50 else 8
-
-    while len(result) < populationSize:
-        parent1, parent2 = selectionRouletteWheel(probabilities, population)
-        children = makeChildren(parent1, parent2)
-        for c in children:
-            if len(result) < populationSize:
-                result.append(twoOptDelta(c, maxIterations=childTwoOptBudget))
-            else:
-                break
-
-    return result
-
-
-# implement mutation at the given mutation rate
-# hybrid implementation, combines swap and insertion mutation based on the tour size
-def mutate(population: Population,
-           mutationRate: float = 0.05,
-           tourSize: int = 0,
-           method: str = AUTO) -> Population:
-    for tour in population:
-        size = tourSize if tourSize != 0 else len(tour)
-        if size < 2:
-            continue
-        if random() <= mutationRate:
-            option = method
-            if method == AUTO:
-                option = INVERT if size >= 8 else SWAP
-
-            # swaps two cities randomly
-            if option == SWAP:
-                i, j = sample(range(size), 2)
-                tour[i], tour[j] = tour[j], tour[i]
-            # changes the order of the cities visited randomly
-            elif option == INVERT:
-                i, j = sorted(sample(range(size), 2))
-                tour[i:j + 1] = reversed(tour[i:j + 1])
-            # default: swap mutation
-            else:
-                i, j = sample(range(size), 2)
-                tour[i], tour[j] = tour[j], tour[i]
-
-    return population
 
 
 # two delta implementation which checks if there are any overlapping edges in the tour and swaps them if any
@@ -478,6 +419,76 @@ def applyTwoOptElites(population: Population,
         newPop[index] = improved
 
     return newPop
+
+
+# crossover implementation to produce new population
+def crossover(population: Population,
+              populationSize: int = 5,
+              probabilities: Optional[FloatList] = None) -> Population:
+
+    parameters = getParams(len(population[0]))
+    # how many elite tours should be selected to apply 2opt on them
+    # 5% of the best tours gets selected for more improvements
+    eliteSize = max(1, int(0.05 * parameters.population))
+
+    if probabilities is None:
+        probabilities = calculateFitness(population)
+
+    indexed = list(enumerate(population))
+    # sort the cities in the tour based on their probabilities
+    indexed.sort(key=lambda indexValue: probabilities[indexValue[0]],
+                 reverse=True)
+    elites = [tour for (_, tour) in indexed[:eliteSize]]
+
+    result: Population = []
+    for e in elites:
+        result.append(e)
+
+    tourSize = len(population[0]) if population else 0
+    childTwoOptBudget = 6 if tourSize <= 50 else 8
+
+    while len(result) < populationSize:
+        parent1, parent2 = selectionRouletteWheel(probabilities, population)
+        children = makeChildren(parent1, parent2)
+        for child in children:
+            if len(result) < populationSize:
+                # improve the tour
+                result.append(twoOptDelta(child, childTwoOptBudget))
+            else:
+                break
+
+    return result
+
+
+# implement mutation at the given mutation rate
+# hybrid implementation, combines swap and insertion mutation based on the tour size
+def mutate(population: Population,
+           mutationRate: float = 0.05,
+           tourSize: int = 0,
+           method: str = AUTO) -> Population:
+    for tour in population:
+        size = tourSize if tourSize != 0 else len(tour)
+        if size < 2:
+            continue
+        if random() <= mutationRate:
+            option = method
+            if method == AUTO:
+                option = INVERT if size >= 8 else SWAP
+
+            # swaps two cities randomly
+            if option == SWAP:
+                i, j = sample(range(size), 2)
+                tour[i], tour[j] = tour[j], tour[i]
+            # changes the order of the cities visited randomly
+            elif option == INVERT:
+                i, j = sorted(sample(range(size), 2))
+                tour[i:j + 1] = reversed(tour[i:j + 1])
+            # default: swap mutation
+            else:
+                i, j = sample(range(size), 2)
+                tour[i], tour[j] = tour[j], tour[i]
+
+    return population
 
 
 def main() -> None:
