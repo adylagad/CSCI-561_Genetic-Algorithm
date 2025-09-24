@@ -46,8 +46,8 @@ Presets = Dict[int, 'Params']
 # all the parameters are defined in the Params data class
 def getParams(n: int) -> Params:
     presets: Presets = {
-        50: Params(200, 500, 0.08, 50, 1),
-        100: Params(140, 380, 0.07, 35, 0.7),
+        50: Params(180, 495, 0.08, 45, 1),
+        100: Params(138, 375, 0.07, 34, 0.7),
         200: Params(90, 250, 0.06, 25, 0.6),
         500: Params(60, 200, 0.05, 20, 0.5),
     }
