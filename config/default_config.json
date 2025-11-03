@@ -1,0 +1,11 @@
+{
+	"mutation_rate": 0.05,
+	"number_of_generations": 3500,
+	"convergence_threshold": 50,
+	"population_size_multiplier": 1,
+	"input_file": "input/input1.txt",
+	"output_dir": "output",
+	"log_level": "INFO",
+	"verbose": true,
+	"log_interval": 100
+}
