@@ -76,7 +76,7 @@ The framework follows **SOLID principles** and uses **Strategy Pattern** for ope
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                    GeneticAlgorithm                         │
-│                   (Main Orchestrator)                        │
+│                   (Main Orchestrator)                       │
 └─────────────────────────────────────────────────────────────┘
                           │
           ┌───────────────┼───────────────┐
