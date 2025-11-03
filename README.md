@@ -18,18 +18,21 @@ This refactoring was performed **after the assignment deadline and submission** 
 
 ## 📋 Table of Contents
 
--   [Overview](#overview)
--   [Features](#features)
--   [Architecture](#architecture)
--   [Project Structure](#project-structure)
--   [Installation & Setup](#installation--setup)
--   [How to Run](#how-to-run)
--   [Input/Output Format](#inputoutput-format)
--   [Configuration](#configuration)
--   [Available Components](#available-components)
--   [Code Examples](#code-examples)
--   [Extending the Framework](#extending-the-framework)
--   [Testing](#testing)
+-   [Overview](#-overview)
+-   [Features](#-features)
+-   [Architecture](#-architecture)
+-   [Project Structure](#-project-structure)
+-   [Installation & Setup](#-installation--setup)
+-   [How to Run](#-how-to-run)
+-   [Input/Output Format](#-inputoutput-format)
+-   [Configuration](#️-configuration)
+-   [Available Components](#-available-components)
+-   [Code Examples](#-code-examples)
+-   [Extending the Framework](#-extending-the-framework)
+-   [Testing](#-testing)
+-   [Type System](#-type-system)
+-   [License](#-license)
+-   [Author](#-author)
 
 ## 🎯 Overview
 
