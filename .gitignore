@@ -1,4 +1,33 @@
+# Python
 __pycache__/
-findings.txt
-all_in_one.py
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+
+# Output files
 output.txt
+output/
+*.log
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Config (optional - uncomment if you want to ignore custom configs)
+# config/custom_*.json
+
+# Virtual environment
+venv/
+env/
+ENV/

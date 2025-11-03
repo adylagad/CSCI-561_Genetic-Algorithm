@@ -1,0 +1,25 @@
+# Python dependencies for the Genetic Algorithm project
+
+# No external dependencies required for basic functionality
+# The project uses only Python standard library
+
+# Optional dependencies for development and enhancement:
+
+# For testing (if you want to add unit tests)
+# pytest>=7.0.0
+# pytest-cov>=4.0.0
+
+# For code quality
+# pylint>=2.15.0
+# mypy>=0.990
+# black>=22.0.0
+
+# For visualization (future enhancement)
+# matplotlib>=3.5.0
+# numpy>=1.21.0
+
+# For better logging
+# colorlog>=6.7.0
+
+# Project metadata
+# Python 3.7+
